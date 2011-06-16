@@ -10,6 +10,7 @@ from cms.plugins.inherit.models import InheritPagePlaceholder
 from cms.plugins.text.models import Text
 from cms.plugins.text.utils import (plugin_tags_to_id_list, 
     plugin_tags_to_admin_html)
+from cms.sitemaps.cms_sitemap import CMSSitemap
 from cms.test.testcases import (CMSTestCase, URL_CMS_PAGE, URL_CMS_PAGE_ADD, 
     URL_CMS_PLUGIN_ADD, URL_CMS_PLUGIN_EDIT, URL_CMS_PAGE_CHANGE, 
     URL_CMS_PLUGIN_REMOVE)
@@ -23,6 +24,7 @@ from django.template import RequestContext
 from testapp.pluginapp.models import Article, Section
 from testapp.pluginapp.plugins.manytomany_rel.models import ArticlePluginModel
 import os
+import datetime
 
 
     
@@ -476,7 +478,21 @@ class PluginsTestCase(PluginsTestBaseCase):
 
         new_plugin = Text.objects.get(pk=6)
         self.assertEquals(plugin_tags_to_id_list(new_plugin.body), [u'4', u'5'])
+
+    def test_12_editing_plugin_changes_page_modification_time_in_sitemap(self):
+        now = datetime.datetime.now()
+        one_day_ago = now - datetime.timedelta(days=1)
+        page = self.create_page(published=True)
+        page.publication_date = now
+        page.creation_date = one_day_ago
+        page.changed_date = one_day_ago
         
+        plugin_id = self._create_text_plugin_on_page(page)
+        plugin = self._edit_text_plugin(plugin_id, "fnord")
+        
+        actual_last_modification_time = CMSSitemap().lastmod(page)
+        self.assertEqual(plugin.changed_date, actual_last_modification_time)
+
 class PluginManyToManyTestCase(PluginsTestBaseCase):
 
     def setUp(self):
