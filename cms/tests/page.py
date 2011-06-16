@@ -14,6 +14,7 @@ from django.contrib.sites.models import Site
 from django.core.urlresolvers import reverse
 from django.http import HttpRequest
 import os.path
+import datetime
 
 class PagesTestCase(CMSTestCase):
 
@@ -395,6 +396,28 @@ class PagesTestCase(CMSTestCase):
             self.assertTrue(found_page)
             self.assertEqual(found_page.pk, page.pk)
 
+    def test_24_sitemap_includes_last_modification_date(self):
+        one_day_ago = datetime.datetime.now() - datetime.timedelta(days=1)
+        page = self.create_page(published=True)
+        page.publication_date = one_day_ago
+        page.creation_date = one_day_ago
+        page.save()
+        sitemap = CMSSitemap()
+        self.assertEqual(sitemap.items().count(), 1)
+        actual_last_modification_time = sitemap.lastmod(sitemap.items()[0])
+        self.assertTrue(actual_last_modification_time > one_day_ago)
+
+    def test_25_sitemap_uses_publication_date_when_later_than_modification(self):
+        now = datetime.datetime.now()
+        one_day_ago = now - datetime.timedelta(days=1)
+        page = self.create_page(published=True)
+        page.publication_date = now
+        page.creation_date = one_day_ago
+        page.changed_date = one_day_ago
+        sitemap = CMSSitemap()
+        actual_last_modification_time = sitemap.lastmod(page)
+        self.assertEqual(actual_last_modification_time, now)
+            
 
 class NoAdminPageTests(CMSTestCase):
     urls = 'testapp.noadmin_urls'
