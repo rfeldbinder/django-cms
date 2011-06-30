@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import with_statement
 from cms import plugin_rendering
+from cms.middleware.multilingual import MultilingualURLMiddleware
 from cms.models import Page, Title, CMSPlugin
 from cms.plugin_rendering import render_plugins, PluginContext
 from cms.plugins.text.models import Text
@@ -308,6 +309,28 @@ class RenderingTestCase(CMSTestCase):
             r = self.strip_rendered(response.content)
             self.assertEqual(r, u'|'+self.test_data['text_main']+u'|'+self.test_data['text_sub']+u'|')
 
+    def test_14_multilingual_urls_point_to_original_language_when_not_redirecting(self):
+        """
+        When using the fallback language for a request, the replaced urls point to
+        the requsted, instead of the fallback language.
+        """
+        from cms.views import details
+        middleware = MultilingualURLMiddleware()
+        requested_language = settings.LANGUAGES[1][0]
+        fallback_language = settings.LANGUAGES[0][0]
 
+        test_settings = dict(CMS_TEMPLATES = ((TEMPLATE_NAME, ''),),
+                             CMS_LANGUAGE_FALLBACK = 'no_redirect')
+
+        with SettingsOverride(**test_settings):
+            instance, plugin_class = CMSPlugin.objects.all()[0].get_plugin_instance()
+            instance.body = '<a href="/slug/">fnord</a>'
+            instance.save()
+            request = self.get_request(path="/fr/renderingtestcase-slug ", language=requested_language)
+            middleware.process_request(request)
+            response = details(request, slug=self.test_page.get_slug())
+            response = middleware.process_response(request, response)
+            self.assertContains(response, '/%s/slug' % requested_language)
+            self.assertNotContains(response, '/%s/slug' % fallback_language)
 
 
