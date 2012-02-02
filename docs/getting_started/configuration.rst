@@ -245,7 +245,13 @@ CMS_LANGUAGE_FALLBACK
 Default: ``True``
 
 This will redirect the browser to the same page in another language if the
-page is not available in the current language.
+page is not available in the current language. It redirects to a language
+defined in CMS_LANGUAGE_CONF. If it can't find a fallback there, it
+tries to find one in ``CMS_LANGUAGES``.
+
+If set to ``False``, the lanaguage fallback functionality is not active.
+If set to ``'no_redirect'`` it will display the fallback content directly
+instead of redirecting to the fallback language URL.
 
 .. setting:: CMS_LANGUAGE_CONF
 
@@ -254,7 +260,8 @@ CMS_LANGUAGE_CONF
 
 Default: ``{}``
 
-Language fallback ordering for each language.
+Language fallback ordering for each language. It's only usefull, if
+``CMS_LANGUAGE_FALLBACK`` is enabled.
 
 Example::
 
@@ -263,7 +270,16 @@ Example::
         'en': ['de'],
     }
 
+<<<<<<< HEAD
 .. setting:: CMS_SITE_LANGUAGES
+=======
+This means, if content for ``de`` is not available, the fallback is ``en``. If
+``en`` is also not available, the next fallback is ``fr``. If ``fr`` is also
+not available, it will use the first match it can find for any language in
+``CMS_LANGUAGES``. If this also fails, it will return a HTTP404 response.
+The same goes for ``en`` but here only one explicit fallback is defined.
+
+>>>>>>> 8cf6a658c93e65520c8d7dd85edb1695829dd64d
 
 CMS_SITE_LANGUAGES
 ==================
@@ -567,3 +583,4 @@ Example::
 
     Django 1.3 introduced a site-wide cache key prefix. See Django's own docs on
     :ref:`cache key prefixing <django:cache_key_prefixing>`
+

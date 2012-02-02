@@ -317,3 +317,21 @@ class RenderingTestCase(SettingsOverrideTestCase):
         output = render_placeholder_toolbar(placeholder, context, '', 'test')
         for cls in classes:
             self.assertTrue(cls in output, '%r is not in %r' % (cls, output))
+
+    def test_13_detail_view_fallsback_language_no_redirect(self):
+        """
+        Ask for a page in a language that doesn't exist, and assert that it fallsback.
+        But does no redirect and displays the content directly.
+        """
+
+        test_settings = dict(CMS_TEMPLATES = ((TEMPLATE_NAME, ''),),
+                             CMS_LANGUAGE_FALLBACK = 'no_redirect')
+
+        with SettingsOverride(**test_settings):
+            from cms.views import details
+            request = self.get_request(language=settings.LANGUAGES[1][0])
+            response = details(request, slug=self.test_page.get_slug())
+            r = self.strip_rendered(response.content)
+            self.assertEqual(r, u'|'+self.test_data['text_main']+u'|'+self.test_data['text_sub']+u'|')
+
+
