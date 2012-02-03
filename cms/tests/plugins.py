@@ -14,6 +14,7 @@ from cms.plugins.link.models import Link
 from cms.plugins.text.models import Text
 from cms.plugins.text.utils import (plugin_tags_to_id_list, 
     plugin_tags_to_admin_html)
+from cms.sitemaps.cms_sitemap import CMSSitemap
 from cms.plugins.twitter.models import TwitterRecentEntries
 from cms.test_utils.testcases import (CMSTestCase, URL_CMS_PAGE, 
     URL_CMS_PAGE_ADD, URL_CMS_PLUGIN_ADD, URL_CMS_PLUGIN_EDIT, URL_CMS_PAGE_CHANGE, 
@@ -30,6 +31,7 @@ from django.test.testcases import TestCase
 from project.pluginapp.models import Article, Section
 from project.pluginapp.plugins.manytomany_rel.models import ArticlePluginModel
 import os
+import datetime
 
 
 class DumbFixturePlugin(CMSPluginBase):
@@ -75,6 +77,7 @@ class PluginsTestBaseCase(CMSTestCase):
 
 
 class PluginsTestCase(PluginsTestBaseCase):
+
     def test_add_edit_plugin(self):
         """
         Test that you can add a text plugin
@@ -83,6 +86,8 @@ class PluginsTestCase(PluginsTestBaseCase):
         page_data = self.get_new_page_data()
         response = self.client.post(URL_CMS_PAGE_ADD, page_data)
         page = Page.objects.all()[0]
+
+    def _create_text_plugin_on_page(self, page):
         plugin_data = {
             'plugin_type':"TextPlugin",
             'language':settings.LANGUAGES[0][0],
@@ -90,17 +95,33 @@ class PluginsTestCase(PluginsTestBaseCase):
         }
         response = self.client.post(URL_CMS_PLUGIN_ADD, plugin_data)
         self.assertEquals(response.status_code, 200)
-        self.assertEquals(int(response.content), CMSPlugin.objects.all()[0].pk)
-        # now edit the plugin
-        edit_url = URL_CMS_PLUGIN_EDIT + response.content + "/"
+        created_plugin_id = int(response.content)
+        self.assertEquals(created_plugin_id, CMSPlugin.objects.all()[0].pk)
+        return created_plugin_id
+
+    def _edit_text_plugin(self, plugin_id, text):
+        edit_url = "%s%s/" % (URL_CMS_PLUGIN_EDIT, plugin_id) 
         response = self.client.get(edit_url)
         self.assertEquals(response.status_code, 200)
         data = {
-            "body":"Hello World"
+            "body": text
         }
         response = self.client.post(edit_url, data)
         self.assertEquals(response.status_code, 200)
-        txt = Text.objects.all()[0]
+        txt = Text.objects.get(pk=plugin_id)
+        return txt
+
+    def test_01_add_edit_plugin(self):
+        """
+        Test that you can add a text plugin
+        """
+        # add a new text plugin
+        page_data = self.get_new_page_data()
+        response = self.client.post(URL_CMS_PAGE_ADD, page_data)
+        page = Page.objects.all()[0]
+        created_plugin_id = self._create_text_plugin_on_page(page)
+        # now edit the plugin
+        txt = self._edit_text_plugin(created_plugin_id, "Hello World")
         self.assertEquals("Hello World", txt.body)
 
     def test_copy_plugins(self):
@@ -445,7 +466,21 @@ class FileSystemPluginTests(PluginsTestBaseCase):
         plugin.file.save("UPPERCASE.JPG", SimpleUploadedFile("UPPERCASE.jpg", "content"), False)
         plugin.insert_at(None, position='last-child', save=True)
         self.assertNotEquals(plugin.get_icon_url().find('jpg'), -1)
+        self.assertEquals(plugin_tags_to_id_list(new_plugin.body), [u'4', u'5'])
 
+    def test_12_editing_plugin_changes_page_modification_time_in_sitemap(self):
+        now = datetime.datetime.now()
+        one_day_ago = now - datetime.timedelta(days=1)
+        page = self.create_page(published=True)
+        page.publication_date = now
+        page.creation_date = one_day_ago
+        page.changed_date = one_day_ago
+        
+        plugin_id = self._create_text_plugin_on_page(page)
+        plugin = self._edit_text_plugin(plugin_id, "fnord")
+        
+        actual_last_modification_time = CMSSitemap().lastmod(page)
+        self.assertEqual(plugin.changed_date, actual_last_modification_time)
 
 class PluginManyToManyTestCase(PluginsTestBaseCase):
 
